@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+import os
+from pathlib import Path
+import hashlib
+import argparse
+from collections import defaultdict
+from typing import Dict, List
+import shutil
+import sys
+
+# [Previous ProgressBar class and get_file_hash function remain the same]
+
+def find_duplicates(directory: str, ignore_patterns: List[str] = None) -> Dict[str, List[Path]]:
+    """Find duplicate files in the given directory."""
+    if ignore_patterns is None:
+        ignore_patterns = ['.git', '__pycache__', 'node_modules', '.venv']
+
+    # [Rest of find_duplicates function remains the same]
+
+def handle_duplicates(file_list: List[Path], auto_delete: bool = False, keep_first: bool = True) -> None:
+    """Handle duplicate files with options for automatic deletion."""
+    total_size = sum(f.stat().st_size for f in file_list)
+    duplicate_size = sum(f.stat().st_size for f in file_list[1:])
+    
+    if not auto_delete:
+        print(f"\nDuplicate files (Total size: {format_size(total_size)}, Duplicate size: {format_size(duplicate_size)}):")
+        for idx, file_path in enumerate(file_list, 1):
+            print(f"{idx}. {file_path}")
+
+    if auto_delete:
+        # In auto-delete mode, always keep the first file and delete the rest
+        to_delete = file_list[1:] if keep_first else file_list
+        size_to_delete = sum(f.stat().st_size for f in to_delete)
+        
+        print(f"Automatically deleting {len(to_delete)} files (Size: {format_size(size_to_delete)})...")
+        progress = ProgressBar(len(to_delete), prefix='Deleting files:')
+        
+        for file_path in to_delete:
+            try:
+                file_path.unlink()
+                progress.update()
+            except Exception as e:
+                print(f"Error deleting {file_path}: {str(e)}")
+        return
+
+    # [Rest of interactive deletion logic remains the same]
+
+def main():
+    parser = argparse.ArgumentParser(description="Find duplicate files in a directory")
+    parser.add_argument("directory", nargs="?", default=".",
+                      help="Directory to scan (default: current directory)")
+    parser.add_argument("--ignore", "-i", nargs="+",
+                      default=['.git', '__pycache__', 'node_modules', '.venv'],
+                      help="Patterns to ignore")
+    parser.add_argument("--auto-delete", "-a", action="store_true",
+                      help="Automatically delete duplicates (keeping the first file in each group)")
+    parser.add_argument("--delete-all", "-d", action="store_true",
+                      help="Delete all files in duplicate groups (USE WITH CAUTION)")
+    
+    args = parser.parse_args()
+    directory = Path(args.directory).resolve()
+
+    if args.auto_delete and args.delete_all:
+        print("Error: Cannot use both --auto-delete and --delete-all options")
+        sys.exit(1)
+
+    print(f"\nSearching for duplicates in: {directory}")
+    duplicates = find_duplicates(directory, args.ignore)
+
+    if not duplicates:
+        print("\nNo duplicate files found.")
+        return
+
+    total_sets = len(duplicates)
+    total_dupes = sum(len(files) - 1 for files in duplicates.values())
+    print(f"\nFound {total_sets} sets of duplicate files ({total_dupes} duplicate files total)")
+
+    # Handle automatic deletion modes
+    if args.auto_delete or args.delete_all:
+        total_size = sum(sum(f.stat().st_size for f in files) for files in duplicates.values())
+        dupe_size = sum(sum(f.stat().st_size for f in files[1:]) for files in duplicates.values())
+        
+        if args.delete_all:
+            print(f"\nWARNING: About to delete ALL files in duplicate groups (Total size: {format_size(total_size)})")
+        else:
+            print(f"\nWARNING: About to delete duplicate files (Total size to free: {format_size(dupe_size)})")
+        
+        print("Starting deletion in 3 seconds... Press Ctrl+C to cancel")
+        try:
+            import time
+            time.sleep(3)
+        except KeyboardInterrupt:
+            print("\nOperation cancelled.")
+            return
+
+    # Process each duplicate set
+    for hash_value, file_list in duplicates.items():
+        handle_duplicates(file_list, args.auto_delete, not args.delete_all)
+
+if __name__ == "__main__":
+    main()
