@@ -2,7 +2,7 @@
 
 A command-line tool that efficiently finds and manages duplicate files in your filesystem. Built with performance in mind, fdup uses smart size-based pre-filtering and SHA-256 hashing to accurately identify duplicates while minimizing unnecessary file reads.
 
-### Python3 needs to be installed in order for the command to work
+### Requires Python3 to be installed
 
 ## Features
 
